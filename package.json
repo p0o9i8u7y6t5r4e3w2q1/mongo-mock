@@ -5,7 +5,9 @@
   "description": "Let's pretend we have a real MongoDB",
   "main": "mongo-mock.js",
   "scripts": {
-    "test": "mocha"
+    "test": "tsc && mocha ./test-new/mock.test.js",
+    "test:real": "mocha ./test-new/real.test.js",
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
@@ -22,17 +24,25 @@
   "homepage": "https://github.com/williamkapke/mongo-mock",
   "dependencies": {
     "bson-objectid": "^1.2.5",
-    "debug": "^2.6.9",
-    "lodash": "^4.17.13",
     "lokijs": "^1.5.9",
-    "mingo": "https://github.com/p0o9i8u7y6t5r4e3w2q1/mingo#commonjs-release",
-    "modifyjs": "^0.3.1",
-    "object-assign-deep": "^0.4.0",
-    "sift": "^11.1.8"
+    "mingo": "^3.0.3"
   },
   "devDependencies": {
+    "@types/lokijs": "^1.5.3",
+    "@types/mongodb": "^3.5.25",
+    "@typescript-eslint/eslint-plugin": "^3.6.0",
+    "@typescript-eslint/parser": "^3.6.0",
+    "lodash": "^4.17.13",
+    "eslint": "^7.4.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-import": "^2.22.0",
     "mocha": "^5",
-    "should": "^5"
+    "mongodb": "^3.5.9",
+    "should": "^5",
+    "typescript": "^3.9.6"
+  },
+  "prettier": {
+    "printWidth": 110
   },
   "engines": {
     "node": ">=6"

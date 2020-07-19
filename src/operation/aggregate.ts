@@ -1,18 +1,14 @@
-// @ts-check
-/** @typedef {import('mingo/lazy').Iterator} Iterator */
 require("mingo/init/system");
-const mingo = require("mingo");
-const { Lazy } = require("mingo/lazy");
-const { resolve, setValue, cloneDeep, each, keys } = require("mingo/util");
-const ops = require("mingo/operators/pipeline");
+import { Lazy, Iterator } from "mingo/lazy";
+import { resolve, setValue, cloneDeep, each, keys } from "mingo/util";
+import { Db } from "../db";
+import { Collection } from "../collection";
+import * as mingo from "mingo";
+import * as ops from "mingo/operators/pipeline";
 const defaultOptions = { config: { idKey: "_id" } };
 
-/**
- * @param {import('mongodb').Db} db
- * @param {import('mongodb').Collection} coll
- * @param {any[]} pipelines
- */
-async function aggregateFn(db, coll, pipelines) {
+const log = console.log
+export async function aggregateFn(db: Db, coll: Collection, pipelines: any[]) {
   const data = await coll.find().toArray();
   let iterator = Lazy(data);
   for (const pipeline of pipelines) {
@@ -22,13 +18,7 @@ async function aggregateFn(db, coll, pipelines) {
   return iterator.value();
 }
 
-/**
- * @param {import('mongodb').Db} db
- * @param {import('mongodb').Collection} coll
- * @param {Iterator} prev_result
- * @param {object} pipeline
- */
-async function parseAggregate(db, coll, prev_result, pipeline) {
+async function parseAggregate(db: Db, coll: Collection, prev_result: Iterator, pipeline: object) {
   const key = Object.keys(pipeline)[0];
   const $op = pipeline[key];
 
@@ -41,11 +31,7 @@ async function parseAggregate(db, coll, prev_result, pipeline) {
           each($op.let, (val, key) => {
             newObj["$$" + key] = resolve(item, val);
           });
-          const val = await aggregateFn(
-            db,
-            db.collection($op.from),
-            $op.pipeline
-          );
+          const val = await aggregateFn(db, db.collection($op.from), $op.pipeline);
           if (val.length > 0) setValue(item, $op.as, val);
           result.push(item);
         }
@@ -66,5 +52,3 @@ async function parseAggregate(db, coll, prev_result, pipeline) {
       return ops[key](prev_result, $op, defaultOptions);
   }
 }
-
-module.exports = aggregateFn;

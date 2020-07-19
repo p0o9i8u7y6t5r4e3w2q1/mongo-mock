@@ -1,8 +1,7 @@
-var mongo = require("../");
+// @ts-check
+var mongo = require("mongodb");
 var MongoClient = mongo.MongoClient;
 const base_test = require("./base.test");
-mongo.max_delay = 0;
-MongoClient.persist = "mongo.json";
 console.error = () => {};
 
 describe("mock tests", function () {
@@ -14,11 +13,13 @@ describe("mock tests", function () {
   };
 
   before(function (done) {
-    MongoClient.connect("mongodb://someserver/test_database", function (err, client) {
+    MongoClient.connect("mongodb://localhost/test_database", async function (err, client) {
       s.client = client;
       s.db = client.db();
-      s.coll = s.db.collection("users");
-      done();
+      s.db.dropDatabase(function (err, result) {
+        s.coll = s.db.collection("users");
+        done();
+      });
     });
   });
   after(function (done) {
