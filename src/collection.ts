@@ -1,24 +1,25 @@
 import {
   Collection as _Collection,
-  MongoCallback,
-  FindOneOptions,
+  CollectionInsertManyOptions,
+  CollectionInsertOneOptions,
+  CommonOptions,
+  DeleteWriteOpResultObject,
   FilterQuery,
+  FindAndModifyWriteOpResultObject,
+  FindOneAndUpdateOption,
+  FindOneOptions,
+  IndexOptions,
   InsertOneWriteOpResult,
   InsertWriteOpResult,
+  MongoCallback,
+  MongoCountPreferences,
   OptionalId,
-  WithId,
-  CollectionInsertOneOptions,
-  CollectionInsertManyOptions,
-  DeleteWriteOpResultObject,
-  CommonOptions,
-  IndexOptions,
-  WriteOpResult,
-  UpdateQuery,
-  UpdateOneOptions,
   UpdateManyOptions,
+  UpdateOneOptions,
+  UpdateQuery,
   UpdateWriteOpResult,
-  FindOneAndUpdateOption,
-  FindAndModifyWriteOpResultObject,
+  WithId,
+  WriteOpResult,
 } from "mongodb";
 import { isFunction, cloneDeep, isObject, each, isString } from "mingo/util";
 import { asyncish, deserialize, IdUtil, executeOperation } from "./utils";
@@ -42,14 +43,8 @@ function wrapFilter(query: any) {
 
 interface CollectionState {
   name: string;
-  loki: Loki,
+  loki: Loki;
 }
-
-type InnerUpdateOpResult = UpdateWriteOpResult & {
-  _modified_data?: any;
-  _upserted_data?: any;
-  _origin?: any;
-};
 
 export class Collection<T = OptionalId<any>> {
   _db: Db;
@@ -82,8 +77,8 @@ export class Collection<T = OptionalId<any>> {
     return {
       toArray: () => {
         return aggregateFn(this._db, this, pipeline);
-      }
-    }
+      },
+    };
   }
 
   /** @deprecated Use insertOne, insertMany or bulkWrite */
@@ -484,6 +479,44 @@ export class Collection<T = OptionalId<any>> {
     return this._db.dropCollection(this.collectionName, options, callback);
   }
 
+  /** @deprecated Use countDocuments or estimatedDocumentCount */
+  // @ts-ignore
+  count(callback: MongoCallback<number>): void;
+  count(query: FilterQuery<T>, callback: MongoCallback<number>): void;
+  count(query?: FilterQuery<T>, options?: MongoCountPreferences): Promise<number>;
+  count(query: FilterQuery<T>, options: MongoCountPreferences, callback: MongoCallback<number>): void;
+  count(query?: FilterQuery<T>, options?: MongoCountPreferences, callback?: MongoCallback<number>) {
+    return this.countDocuments(query, options, callback);
+  }
+
+  // @ts-ignore
+  countDocuments(callback: MongoCallback<number>): void;
+  countDocuments(query: FilterQuery<T>, callback: MongoCallback<number>): void;
+  countDocuments(query?: FilterQuery<T>, options?: MongoCountPreferences): Promise<number>;
+  countDocuments(
+    query: FilterQuery<T>,
+    options: MongoCountPreferences,
+    callback: MongoCallback<number>
+  ): void;
+  countDocuments(query: FilterQuery<T>, options: MongoCountPreferences, callback: MongoCallback<number>) {
+    if (isFunction(query)) (callback = query as any), (query = null);
+    else if (isFunction(options)) callback = options as any;
+    if (!isObject(options)) options = {};
+
+    let result = this.find(query);
+    if (options.skip) result = result.skip(options.skip);
+    if (options.limit) result = result.limit(options.limit);
+    return result.count(callback);
+  }
+
+  // @ts-ignore
+  estimatedDocumentCount(callback: MongoCallback<number>): void;
+  estimatedDocumentCount(options?: MongoCountPreferences): Promise<number>;
+  estimatedDocumentCount(options: MongoCountPreferences, callback: MongoCallback<number>): void;
+  estimatedDocumentCount(options: MongoCountPreferences, callback: MongoCallback<number>) {
+    return this.countDocuments(null, options, callback);
+  }
+
   // @ts-ignore
   createIndex(fieldOrSpec: string | any, callback: MongoCallback<string>): void;
   createIndex(fieldOrSpec: string | any, options?: IndexOptions): Promise<string>;
@@ -524,269 +557,3 @@ export class Collection<T = OptionalId<any>> {
   // @ts-ignore
   bulkWrite = NotImplemented;
 }
-
-//     aggregate<T = TSchema>(callback: MongoCallback<AggregationCursor<T>>): AggregationCursor<T>;
-//     aggregate<T = TSchema>(pipeline: object[], callback: MongoCallback<AggregationCursor<T>>): AggregationCursor<T>;
-//     aggregate<T = TSchema>(pipeline?: object[], options?: CollectionAggregationOptions, callback?: MongoCallback<AggregationCursor<T>>): AggregationCursor<T>;
-//     /** http://mongodb.github.io/node-mongodb-native/3.0/api/Collection.html#bulkWrite */
-//     bulkWrite(operations: Array<BulkWriteOperation<TSchema>>, callback: MongoCallback<BulkWriteOpResultObject>): void;
-//     bulkWrite(operations: Array<BulkWriteOperation<TSchema>>, options?: CollectionBulkWriteOptions): Promise<BulkWriteOpResultObject>;
-//     bulkWrite(operations: Array<BulkWriteOperation<TSchema>>, options: CollectionBulkWriteOptions, callback: MongoCallback<BulkWriteOpResultObject>): void;
-//     /**
-//      * http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#count
-//      * @deprecated Use countDocuments or estimatedDocumentCount
-//      */
-//     count(callback: MongoCallback<number>): void;
-//     count(query: FilterQuery<TSchema>, callback: MongoCallback<number>): void;
-//     count(query?: FilterQuery<TSchema>, options?: MongoCountPreferences): Promise<number>;
-//     count(query: FilterQuery<TSchema>, options: MongoCountPreferences, callback: MongoCallback<number>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#countDocuments */
-//     countDocuments(callback: MongoCallback<number>): void;
-//     countDocuments(query: FilterQuery<TSchema>, callback: MongoCallback<number>): void;
-//     countDocuments(query?: FilterQuery<TSchema>, options?: MongoCountPreferences): Promise<number>;
-//     countDocuments(query: FilterQuery<TSchema>, options: MongoCountPreferences, callback: MongoCallback<number>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#createIndex */
-//     createIndex(fieldOrSpec: string | any, callback: MongoCallback<string>): void;
-//     createIndex(fieldOrSpec: string | any, options?: IndexOptions): Promise<string>;
-//     createIndex(fieldOrSpec: string | any, options: IndexOptions, callback: MongoCallback<string>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#createIndexes and  http://docs.mongodb.org/manual/reference/command/createIndexes/ */
-//     createIndexes(indexSpecs: IndexSpecification[], callback: MongoCallback<any>): void;
-//     createIndexes(indexSpecs: IndexSpecification[], options?: { session?: ClientSession }): Promise<any>;
-//     createIndexes(indexSpecs: IndexSpecification[], options: { session?: ClientSession }, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#deleteMany */
-//     deleteMany(filter: FilterQuery<TSchema>, callback: MongoCallback<DeleteWriteOpResultObject>): void;
-//     deleteMany(filter: FilterQuery<TSchema>, options?: CommonOptions): Promise<DeleteWriteOpResultObject>;
-//     deleteMany(filter: FilterQuery<TSchema>, options: CommonOptions, callback: MongoCallback<DeleteWriteOpResultObject>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#deleteOne */
-//     deleteOne(filter: FilterQuery<TSchema>, callback: MongoCallback<DeleteWriteOpResultObject>): void;
-//     deleteOne(filter: FilterQuery<TSchema>, options?: CommonOptions & { bypassDocumentValidation?: boolean }): Promise<DeleteWriteOpResultObject>;
-//     deleteOne(filter: FilterQuery<TSchema>, options: CommonOptions & { bypassDocumentValidation?: boolean }, callback: MongoCallback<DeleteWriteOpResultObject>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#distinct */
-//     distinct<Key extends keyof WithId<TSchema>>(key: Key, callback: MongoCallback<Array<FlattenIfArray<WithId<TSchema>[Key]>>>): void;
-//     distinct<Key extends keyof WithId<TSchema>>(key: Key, query: FilterQuery<TSchema>, callback: MongoCallback<Array<FlattenIfArray<WithId<TSchema>[Key]>>>): void;
-//     distinct<Key extends keyof WithId<TSchema>>(key: Key, query?: FilterQuery<TSchema>, options?: MongoDistinctPreferences): Promise<Array<FlattenIfArray<WithId<TSchema>[Key]>>>;
-//     distinct<Key extends keyof WithId<TSchema>>(key: Key, query: FilterQuery<TSchema>, options: MongoDistinctPreferences, callback: MongoCallback<Array<FlattenIfArray<WithId<TSchema>[Key]>>>): void;
-//     distinct(key: string, callback: MongoCallback<any[]>): void;
-//     distinct(key: string, query: FilterQuery<TSchema>, callback: MongoCallback<any[]>): void;
-//     distinct(key: string, query?: FilterQuery<TSchema>, options?: MongoDistinctPreferences): Promise<any[]>;
-//     distinct(key: string, query: FilterQuery<TSchema>, options: MongoDistinctPreferences, callback: MongoCallback<any[]>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#drop */
-//     drop(options?: { session: ClientSession }): Promise<any>;
-//     drop(callback: MongoCallback<any>): void;
-//     drop(options: { session: ClientSession }, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#dropIndex */
-//     dropIndex(indexName: string, callback: MongoCallback<any>): void;
-//     dropIndex(indexName: string, options?: CommonOptions & { maxTimeMS?: number }): Promise<any>;
-//     dropIndex(indexName: string, options: CommonOptions & { maxTimeMS?: number }, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#dropIndexes */
-//     dropIndexes(options?: { session?: ClientSession, maxTimeMS?: number }): Promise<any>;
-//     dropIndexes(callback?: MongoCallback<any>): void;
-//     dropIndexes(options: { session?: ClientSession, maxTimeMS?: number }, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#estimatedDocumentCount */
-//     estimatedDocumentCount(callback: MongoCallback<number>): void;
-//     estimatedDocumentCount(query: FilterQuery<TSchema>, callback: MongoCallback<number>): void;
-//     estimatedDocumentCount(query?: FilterQuery<TSchema>, options?: MongoCountPreferences): Promise<number>;
-//     estimatedDocumentCount(query: FilterQuery<TSchema>, options: MongoCountPreferences, callback: MongoCallback<number>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#find */
-//     find<T = TSchema>(query?: FilterQuery<TSchema>): Cursor<T>;
-//     find<T = TSchema>(query: FilterQuery<TSchema>, options?: FindOneOptions): Cursor<T>;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#findOne */
-//     findOne<T = TSchema>(filter: FilterQuery<TSchema>, callback: MongoCallback<T | null>): void;
-//     findOne<T = TSchema>(filter: FilterQuery<TSchema>, options?: FindOneOptions): Promise<T | null>;
-//     findOne<T = TSchema>(filter: FilterQuery<TSchema>, options: FindOneOptions, callback: MongoCallback<T | null>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#findOneAndDelete */
-//     findOneAndDelete(filter: FilterQuery<TSchema>, callback: MongoCallback<FindAndModifyWriteOpResultObject<TSchema>>): void;
-//     findOneAndDelete(filter: FilterQuery<TSchema>, options?: FindOneAndDeleteOption): Promise<FindAndModifyWriteOpResultObject<TSchema>>;
-//     findOneAndDelete(filter: FilterQuery<TSchema>, options: FindOneAndDeleteOption, callback: MongoCallback<FindAndModifyWriteOpResultObject<TSchema>>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#findOneAndReplace */
-//     findOneAndReplace(filter: FilterQuery<TSchema>, replacement: object, callback: MongoCallback<FindAndModifyWriteOpResultObject<TSchema>>): void;
-//     findOneAndReplace(filter: FilterQuery<TSchema>, replacement: object, options?: FindOneAndReplaceOption): Promise<FindAndModifyWriteOpResultObject<TSchema>>;
-//     findOneAndReplace(filter: FilterQuery<TSchema>, replacement: object, options: FindOneAndReplaceOption, callback: MongoCallback<FindAndModifyWriteOpResultObject<TSchema>>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#findOneAndUpdate */
-//     findOneAndUpdate(filter: FilterQuery<TSchema>, update: UpdateQuery<TSchema> | TSchema, callback: MongoCallback<FindAndModifyWriteOpResultObject<TSchema>>): void;
-//     findOneAndUpdate(filter: FilterQuery<TSchema>, update: UpdateQuery<TSchema> | TSchema, options?: FindOneAndUpdateOption): Promise<FindAndModifyWriteOpResultObject<TSchema>>;
-//     findOneAndUpdate(filter: FilterQuery<TSchema>, update: UpdateQuery<TSchema> | TSchema, options: FindOneAndUpdateOption, callback: MongoCallback<FindAndModifyWriteOpResultObject<TSchema>>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#geoHaystackSearch */
-//     geoHaystackSearch(x: number, y: number, callback: MongoCallback<any>): void;
-//     geoHaystackSearch(x: number, y: number, options?: GeoHaystackSearchOptions): Promise<any>;
-//     geoHaystackSearch(x: number, y: number, options: GeoHaystackSearchOptions, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#group */
-//     /** @deprecated MongoDB 3.6 or higher no longer supports the group command. We recommend rewriting using the aggregation framework. */
-//     group(keys: object | any[] | Function | Code, condition: object, initial: object, reduce: Function | Code, finalize: Function | Code, command: boolean, callback: MongoCallback<any>): void;
-//     /** @deprecated MongoDB 3.6 or higher no longer supports the group command. We recommend rewriting using the aggregation framework. */
-//     group(
-//         keys: object | any[] | Function | Code,
-//         condition: object,
-//         initial: object,
-//         reduce: Function | Code,
-//         finalize: Function | Code,
-//         command: boolean,
-//         options?: { readPreference?: ReadPreferenceOrMode, session?: ClientSession }
-//     ): Promise<any>;
-//     /** @deprecated MongoDB 3.6 or higher no longer supports the group command. We recommend rewriting using the aggregation framework. */
-//     group(
-//         keys: object | any[] | Function | Code,
-//         condition: object,
-//         initial: object,
-//         reduce: Function | Code,
-//         finalize: Function | Code,
-//         command: boolean,
-//         options: {
-//             readPreference?: ReadPreferenceOrMode,
-//             session?: ClientSession
-//         },
-//         callback: MongoCallback<any>
-//     ): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#indexes */
-//     indexes(options?: { session: ClientSession }): Promise<any>;
-//     indexes(callback: MongoCallback<any>): void;
-//     indexes(options: { session?: ClientSession }, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#indexExists */
-//     indexExists(indexes: string | string[], callback: MongoCallback<boolean>): void;
-//     indexExists(indexes: string | string[], options?: { session: ClientSession }): Promise<boolean>;
-//     indexExists(indexes: string | string[], options: { session: ClientSession }, callback: MongoCallback<boolean>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#indexInformation */
-//     indexInformation(callback: MongoCallback<any>): void;
-//     indexInformation(options?: { full: boolean, session: ClientSession }): Promise<any>;
-//     indexInformation(options: { full: boolean, session: ClientSession }, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#initializeOrderedBulkOp */
-//     initializeOrderedBulkOp(options?: CommonOptions): OrderedBulkOperation;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#initializeUnorderedBulkOp */
-//     initializeUnorderedBulkOp(options?: CommonOptions): UnorderedBulkOperation;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#insertOne */
-//     /** @deprecated Use insertOne, insertMany or bulkWrite */
-//     insert(docs: OptionalId<TSchema>, callback: MongoCallback<InsertWriteOpResult<WithId<TSchema>>>): void;
-//     /** @deprecated Use insertOne, insertMany or bulkWrite */
-//     insert(docs: OptionalId<TSchema>, options?: CollectionInsertOneOptions): Promise<InsertWriteOpResult<WithId<TSchema>>>;
-//     /** @deprecated Use insertOne, insertMany or bulkWrite */
-//     insert(docs: OptionalId<TSchema>, options: CollectionInsertOneOptions, callback: MongoCallback<InsertWriteOpResult<WithId<TSchema>>>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#insertMany */
-//     insertMany(docs: Array<OptionalId<TSchema>>, callback: MongoCallback<InsertWriteOpResult<WithId<TSchema>>>): void;
-//     insertMany(docs: Array<OptionalId<TSchema>>, options?: CollectionInsertManyOptions): Promise<InsertWriteOpResult<WithId<TSchema>>>;
-//     insertMany(docs: Array<OptionalId<TSchema>>, options: CollectionInsertManyOptions, callback: MongoCallback<InsertWriteOpResult<WithId<TSchema>>>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#insertOne */
-//     insertOne(docs: OptionalId<TSchema>, callback: MongoCallback<InsertOneWriteOpResult<WithId<TSchema>>>): void;
-//     insertOne(docs: OptionalId<TSchema>, options?: CollectionInsertOneOptions): Promise<InsertOneWriteOpResult<WithId<TSchema>>>;
-//     insertOne(docs: OptionalId<TSchema>, options: CollectionInsertOneOptions, callback: MongoCallback<InsertOneWriteOpResult<WithId<TSchema>>>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#isCapped */
-//     isCapped(options?: { session: ClientSession }): Promise<any>;
-//     isCapped(callback: MongoCallback<any>): void;
-//     isCapped(options: { session: ClientSession }, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#listIndexes */
-//     listIndexes(options?: { batchSize?: number, readPreference?: ReadPreferenceOrMode, session?: ClientSession }): CommandCursor;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#mapReduce */
-//     mapReduce<TKey, TValue>(map: CollectionMapFunction<TSchema> | string, reduce: CollectionReduceFunction<TKey, TValue> | string, callback: MongoCallback<any>): void;
-//     mapReduce<TKey, TValue>(map: CollectionMapFunction<TSchema> | string, reduce: CollectionReduceFunction<TKey, TValue> | string, options?: MapReduceOptions): Promise<any>;
-//     mapReduce<TKey, TValue>(map: CollectionMapFunction<TSchema> | string, reduce: CollectionReduceFunction<TKey, TValue> | string, options: MapReduceOptions, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#options */
-//     options(options?: { session: ClientSession }): Promise<any>;
-//     options(callback: MongoCallback<any>): void;
-//     options(options: { session: ClientSession }, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#parallelCollectionScan */
-//     parallelCollectionScan(callback: MongoCallback<Array<Cursor<any>>>): void;
-//     parallelCollectionScan(options?: ParallelCollectionScanOptions): Promise<Array<Cursor<any>>>;
-//     parallelCollectionScan(options: ParallelCollectionScanOptions, callback: MongoCallback<Array<Cursor<any>>>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#reIndex */
-//     reIndex(options?: { session: ClientSession }): Promise<any>;
-//     reIndex(callback: MongoCallback<any>): void;
-//     reIndex(options: { session: ClientSession }, callback: MongoCallback<any>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#remove */
-//     /** @deprecated Use use deleteOne, deleteMany or bulkWrite */
-//     remove(selector: object, callback: MongoCallback<WriteOpResult>): void;
-//     /** @deprecated Use use deleteOne, deleteMany or bulkWrite */
-//     remove(selector: object, options?: CommonOptions & { single?: boolean }): Promise<WriteOpResult>;
-//     /** @deprecated Use use deleteOne, deleteMany or bulkWrite */
-//     remove(selector: object, options?: CommonOptions & { single?: boolean }, callback?: MongoCallback<WriteOpResult>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#rename */
-//     rename(newName: string, callback: MongoCallback<Collection<TSchema>>): void;
-//     rename(newName: string, options?: { dropTarget?: boolean, session?: ClientSession }): Promise<Collection<TSchema>>;
-//     rename(newName: string, options: { dropTarget?: boolean, session?: ClientSession }, callback: MongoCallback<Collection<TSchema>>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#replaceOne */
-//     replaceOne(filter: FilterQuery<TSchema>, doc: TSchema, callback: MongoCallback<ReplaceWriteOpResult>): void;
-//     replaceOne(filter: FilterQuery<TSchema>, doc: TSchema, options?: ReplaceOneOptions): Promise<ReplaceWriteOpResult>;
-//     replaceOne(filter: FilterQuery<TSchema>, doc: TSchema, options: ReplaceOneOptions, callback: MongoCallback<ReplaceWriteOpResult>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#save */
-//     /** @deprecated Use insertOne, insertMany, updateOne or updateMany */
-//     save(doc: TSchema, callback: MongoCallback<WriteOpResult>): void;
-//     /** @deprecated Use insertOne, insertMany, updateOne or updateMany */
-//     save(doc: TSchema, options?: CommonOptions): Promise<WriteOpResult>;
-//     /** @deprecated Use insertOne, insertMany, updateOne or updateMany */
-//     save(doc: TSchema, options: CommonOptions, callback: MongoCallback<WriteOpResult>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#stats */
-//     stats(callback: MongoCallback<CollStats>): void;
-//     stats(options?: { scale: number; session?: ClientSession }): Promise<CollStats>;
-//     stats(options: { scale: number; session?: ClientSession }, callback: MongoCallback<CollStats>): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#update */
-//     /** @deprecated use updateOne, updateMany or bulkWrite */
-//     update(
-//         filter: FilterQuery<TSchema>,
-//         update: UpdateQuery<TSchema> | Partial<TSchema>,
-//         callback: MongoCallback<WriteOpResult>,
-//     ): void;
-//     /** @deprecated use updateOne, updateMany or bulkWrite */
-//     update(
-//         filter: FilterQuery<TSchema>,
-//         update: UpdateQuery<TSchema> | Partial<TSchema>,
-//         options?: UpdateOneOptions & { multi?: boolean },
-//     ): Promise<WriteOpResult>;
-//     /** @deprecated use updateOne, updateMany or bulkWrite */
-//     update(
-//         filter: FilterQuery<TSchema>,
-//         update: UpdateQuery<TSchema> | Partial<TSchema>,
-//         options: UpdateOneOptions & { multi?: boolean },
-//         callback: MongoCallback<WriteOpResult>,
-//     ): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#updateMany */
-//     updateMany(
-//         filter: FilterQuery<TSchema>,
-//         update: UpdateQuery<TSchema> | Partial<TSchema>,
-//         callback: MongoCallback<UpdateWriteOpResult>,
-//     ): void;
-//     updateMany(
-//         filter: FilterQuery<TSchema>,
-//         update: UpdateQuery<TSchema> | Partial<TSchema>,
-//         options?: UpdateManyOptions,
-//     ): Promise<UpdateWriteOpResult>;
-//     updateMany(
-//         filter: FilterQuery<TSchema>,
-//         update: UpdateQuery<TSchema> | Partial<TSchema>,
-//         options: UpdateManyOptions,
-//         callback: MongoCallback<UpdateWriteOpResult>,
-//     ): void;
-//     /** http://mongodb.github.io/node-mongodb-native/3.1/api/Collection.html#updateOne */
-//     updateOne(
-//         filter: FilterQuery<TSchema>,
-//         update: UpdateQuery<TSchema> | Partial<TSchema>,
-//         callback: MongoCallback<UpdateWriteOpResult>,
-//     ): void;
-//     updateOne(
-//         filter: FilterQuery<TSchema>,
-//         update: UpdateQuery<TSchema> | Partial<TSchema>,
-//         options?: UpdateOneOptions,
-//     ): Promise<UpdateWriteOpResult>;
-//     updateOne(
-//         filter: FilterQuery<TSchema>,
-//         update: UpdateQuery<TSchema> | Partial<TSchema>,
-//         options: UpdateOneOptions,
-//         callback: MongoCallback<UpdateWriteOpResult>,
-//     ): void;
-//     /**
-//      * @param pipeline - an array of
-//      * {@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline/ aggregation pipeline stages}
-//      * through which to pass change stream documents. This allows for filtering (using `$match`) and manipulating
-//      * the change stream documents.
-//      *
-//      * @param options - optional settings
-//      * @see http://mongodb.github.io/node-mongodb-native/3.6/api/Collection.html#watch
-//      */
-//     watch<T = TSchema>(
-//         pipeline?: object[],
-//         options?: ChangeStreamOptions & { session?: ClientSession },
-//     ): ChangeStream<T>;
-//     /**
-//      * @param options - optional settings
-//      * @see http://mongodb.github.io/node-mongodb-native/3.6/api/Collection.html#watch
-//      */
-//     watch<T = TSchema>(
-//       options?: ChangeStreamOptions & { session?: ClientSession },
-//     ): ChangeStream<T>;

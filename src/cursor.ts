@@ -10,6 +10,7 @@ import { isFunction, isObject } from "mingo/util";
 import { asyncish, deserialize } from "./utils";
 import { modify } from "./operation/modify";
 import { Cursor as MingoCursor } from "mingo/cursor";
+import { EventEmitter } from "events";
 import mingo from "mingo";
 
 function NotImplemented() {
@@ -22,19 +23,29 @@ const CursorState = {
   CLOSED: 2,
 };
 
-export class Cursor<T = any> {
+export class Cursor<T = any> extends EventEmitter {
   private _closed: boolean = false;
   private _s: { idx: number; state: number };
   private _cursor: MingoCursor;
   private _doc: any[];
 
   constructor(doc: any[], options?: any) {
+    super();
     if (!isObject(options)) options = {};
     if (!doc) doc = [doc];
 
     this._cursor = new MingoCursor(doc, () => true, options.projection || {}, { idKey: "_id" });
     this._doc = doc;
     this._s = { idx: 0, state: CursorState.INIT };
+
+    process.nextTick(() => this._triggerStream());
+  }
+
+  private _triggerStream() {
+    for (const item of this._all()) {
+      this.emit("data", item);
+    }
+    this.emit("end");
   }
 
   sort(keyOrList: string | object[] | object, direction?: number): Cursor<T> {
@@ -129,6 +140,10 @@ export class Cursor<T = any> {
     return asyncish(() => {
       return applySkipLimit ? this._cursor.count() : this._doc.length;
     }, callback);
+  }
+
+  stream(options?: { transform?: (document: T) => any }): Cursor<T> {
+    return this;
   }
 
   rewind() {
