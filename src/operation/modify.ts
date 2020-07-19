@@ -138,10 +138,14 @@ function $addToSet(obj: any, expr: object, options: Options) {
   const newObj = cloneDeep(obj);
   each(expr, (val, field) => {
     // TODO: to support $each
-    const oldValue = resolve(obj, field) || [];
+    const oldValue: any[] = resolve(obj, field) || [];
     assert(Array.isArray(oldValue), "$addToSet only allow for array");
 
-    oldValue.push(val);
+    if (val.$each) {
+      assert(Array.isArray(val.$each), "$each only allow for array");
+      for (const item of val.$each) oldValue.push(item);
+    } else oldValue.push(val);
+
     const newValue = unique(oldValue);
     setValue(newObj, field, newValue);
   });
